@@ -1,0 +1,127 @@
+---
+title: "Titanic exercise"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readr)
+setwd('C:\\Users\\Chegwood\\Documents\\Data Science Stuff\\Springboard - Foundations of Data Science\\Titanic ggplot exercise')
+titanic <- read_csv('titanic_clean_2.csv')
+```
+
+## Titanic Exercise from ggplot Tutorial
+
+This is the code that I wrote for the gpplot Tutorial from DataCamp. I used the clean data from the Titanic data wrangling exercies (w/ average ages by class, sex, and survival) so some additional code was needed to produce the graphs from the tutorial.
+
+First, I looked at a bar chart to look at the passengers on board, by class and sex:
+
+```{r}
+ggplot(na.omit(titanic[ , c('pclass', 'sex', 'survived', 'age')]), aes(x = factor(pclass), fill = factor(sex))) +
+  geom_bar(position = 'dodge')
+```
+
+### Faceting by Survival
+
+I then looked to see whether there was a difference if the data was faceted by 'survival':
+
+```{r}
+ggplot(na.omit(titanic[ , c('pclass', 'sex', 'survived', 'age')]), aes(x = factor(pclass), fill = factor(sex))) +
+  geom_bar(position = 'dodge') +
+  facet_grid(. ~ survived)  
+```
+
+### Adding in Age
+
+It looks like females were more likely to survive, as well as those in 1st class. Does age have any difference?
+
+First, I set a variable to define a standard 'jitter' width:
+
+```{r, echo = FALSE}
+posn_j <- position_jitter(width = 0.5)
+```
+
+And finally created a jitter plot with Age as the y axis:
+
+```{r}
+ggplot(na.omit(titanic[ , c('pclass', 'sex', 'survived', 'age')]), aes(x = factor(pclass), y = age, col = factor(sex))) +
+  geom_jitter(size = 3, alpha = 0.5, position = posn_j) +
+  facet_grid(. ~ survived)
+```
+
+## Let's Dig a little Deeper
+
+###Floating helps
+
+Here we can see that the vast majority of those who got on a boat survived, while very few who couldn't make it on a boat lived:
+
+```{r, include = FALSE}
+titanic_2 <- titanic %>%
+  mutate(boat_binary = ifelse(boat == 'None', 0, 1))
+```
+
+```{r}
+ggplot(na.omit(titanic_2[ , c('pclass', 'sex', 'survived', 'age', 'boat_binary')]), 
+       aes(x = age, y = factor(boat_binary), col = factor(pclass), shape = factor(sex))) +
+  geom_jitter(size = 3, alpha = 0.5, position = posn_j) +
+  facet_grid(survived ~ .)
+```
+
+###Proportions vs. Raw Counts
+```{r}
+ggplot(na.omit(titanic[ , c('pclass', 'sex', 'survived', 'age')]), aes(x = factor(pclass), fill = factor(survived))) +
+  geom_bar(position = 'fill') +
+  facet_grid(. ~ sex) +
+  labs(x = 'Class', y = 'Proportion', fill = 'Survived?')
+```
+
+###Relative Tiers from Exit (by deck)
+
+This is a little research and manual effort on my part, but I wanted to see whether being in a cabin close to a staircase and a deck close to the top was helpful to survival. Using blueprints from [link](https://www.encyclopedia-titanica.org/titanic-deckplans/) I created manual tiers of 'closeness' to the top deck. Each deck is a radiates downwards (with A being 1, B being 2... G being 7). All passangers without a cabin listed or with a cabin of T (which I mapped to the Tank deck) was given 8.
+
+The class and deck obviously align quite closely; especially the fact that Class 3 passengers seem entirely relegated to Deck Number 8 (or no cabin at all). Those with cabins, especially those with first class cabins seemed more likely to survive than the others.
+
+```{r include = FALSE}
+titanic_2 <- titanic_2 %>% 
+  separate(cabin, into = c('deck', 'cabin'), sep = 1) %>% 
+  mutate(deck_number = ifelse(deck == 'A', 1, 
+          ifelse(deck == 'B', 2, 
+          ifelse(deck == 'C', 3, 
+          ifelse(deck == 'D', 4,
+          ifelse(deck == 'E', 5,
+          ifelse(deck == 'F', 6,
+          ifelse(deck == 'G', 7, 8))))))))
+```
+
+```{r}
+ggplot(na.omit(titanic_2[ , c('pclass', 'sex', 'survived', 'age', 'deck_number')]), aes(x = factor(deck_number), y = age, 
+                                                                                      col = factor(pclass))) +
+  geom_jitter(position = posn_j, alpha = 0.5) +
+  facet_grid(. ~ survived) +
+  labs(x = 'Deck Number', y = 'Age', col = 'Class')
+```
+
+###Survival Rates by Gender, by Class, and by Age Range (in 10 year increments)
+
+```{r include = FALSE}
+titanic_2 <- titanic_2 %>% 
+  mutate(age_range = cut(titanic_2$age,seq(0, 100, by = 10)))
+```
+
+```{r}
+titanic_2 %>% 
+  group_by(sex) %>% 
+  summarise(mean(survived, na.rm = TRUE))
+
+titanic_2 %>% 
+  group_by(pclass) %>% 
+  summarise(mean(survived, na.rm = TRUE))
+
+titanic_2 %>% 
+  group_by(age_range) %>% 
+  summarise(mean(survived, na.rm = TRUE))
+```
+
+This high-level data analysis shows at least one thing to be true: the maxim "Women and children first" held true in the case of the Titanic.
